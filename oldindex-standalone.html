@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GDSpeller 1.2</title>
+    <style>
+        body {
+            font-family: 'Material You', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            color: #fff;
+        }
+
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        main {
+            max-width: 600px;
+            margin: 2rem auto;
+            text-align: center;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        input {
+            padding: 0.5rem;
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            background-color: #555;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background-color: #777;
+        }
+
+        #result {
+            margin-top: 1rem;
+        }
+
+        h2 {
+            color: #5100d4;
+        }
+
+        p {
+            margin: 0.5rem 0;
+        }
+
+        hr {
+            border: 1px solid #555;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>GDSpeller 1.2</h1>
+    </header>
+    <main>
+        <label for="levelNames">Enter:</label>
+        <input type="text" id="levelNames" placeholder="I hate making this so much">
+
+        <button onclick="composeMessage()">MAKE!</button>
+
+        <div id="result"></div>
+    </main>
+
+    <script src="https://shikoshib.github.io/gba-max.min.js"></script>
+    <script>
+async function composeMessage() {
+    const levelNamesInput = document.getElementById('levelNames').value;
+    const resultContainer = document.getElementById('result');
+
+    const levelNames = levelNamesInput.split(/\s+/);
+
+    resultContainer.innerHTML = '<h2>Output</h2>';
+    
+    if (levelNames && levelNames.length > 0) {
+        const composedLevels = [];
+        const usedLevelIds = new Set();
+
+        async function processWord(index) {
+            if (index < levelNames.length) {
+                const currentPhrase = levelNames[index];
+
+                if (currentPhrase.length < 3) {
+                    resultContainer.innerHTML += `<p>The word ${currentPhrase} is too short.</p>`;
+                } else if (currentPhrase.toLowerCase() === 'the') {
+                    resultContainer.innerHTML += `<p>The word 'The' breaks the API wrapper for some reason.</p>`;
+                } else {
+                    try {
+                        const levelData = await getLevelData(currentPhrase);
+
+                        if (!usedLevelIds.has(levelData.id)) {
+                            usedLevelIds.add(levelData.id);
+
+                            composedLevels.push(levelData);
+
+                            resultContainer.innerHTML += `<p><strong>Title:</strong> ${levelData.name}</p>
+                                                        <p><strong>Creator:</strong> ${levelData.creator}</p>
+                                                        <p><strong>ID:</strong> ${levelData.id || 'No description available'}</p>
+                                                        <hr>`;
+                        } else {
+                            resultContainer.innerHTML += `<p>Level with ID ${levelData.id} already used. Trying alternatives...</p>`;
+                            await processBestOption(currentPhrase, index, true);
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching data for level ${currentPhrase}:`, error);
+                        resultContainer.innerHTML += `<p>No exact match found for '${currentPhrase}'. Trying the best option...</p>`;
+
+                        await processBestOption(currentPhrase, index, false);
+                    }
+                }
+
+                await processWord(index + 1);
+                if (index + 1 === levelNames.length) {
+                    generateLink(composedLevels);
+                }
+            } else {
+                console.log('Processed Levels:', composedLevels);
+            }
+        }
+
+        await processWord(0);
+    } else {
+        resultContainer.innerHTML += '<p>No level names entered.</p>';
+    }
+}
+
+
+        async function getLevelData(levelName) {
+    let currentPage = 1;
+    let levelData;
+
+    while (!levelData) {
+        try {
+            const searchResults = await searchLevels(levelName, currentPage);
+            const exactMatch = searchResults.find(result => result.name.toLowerCase() === levelName.toLowerCase());
+
+            if (exactMatch) {
+                levelData = exactMatch;
+            } else if (searchResults.length === 0) {
+                break;
+            } else {
+                currentPage++;
+            }
+        } catch (error) {
+            console.error(`Error fetching data for level ${levelName}:`, error);
+            break;
+        }
+    }
+
+    if (!levelData) {
+        throw new Error(`No exact match found for '${levelName}'.`);
+    }
+
+    return levelData;
+}
+
+        async function getBestOption(levelName) {
+            const searchResults = await searchLevels(levelName);
+            
+            return searchResults[0];
+        }
+        function generateLink(composedLevels) {
+            const outputContainer = document.getElementById('result');
+            const levelIds = composedLevels.map(level => level.id).join(',');
+            const levelCount = composedLevels.length;
+
+            
+            const link = document.createElement('a');
+            link.href = `https://gdbrowser.com/search/${levelIds}?list&count=${levelCount}&header=Output`;
+            link.textContent = 'GDBrowser';
+            link.target = '_blank';
+
+            
+            const outputHeading = document.querySelector('#result h2');
+            outputHeading.insertAdjacentElement('afterend', link);
+        }
+    </script>
+</body>
+</html>
