@@ -2,7 +2,10 @@ async function composeMessage() {
     const levelNamesInput = document.getElementById('levelNames').value;
     const resultContainer = document.getElementById('result');
 
-    const levelNames = levelNamesInput.split(/\s+/);
+    const levelNames = levelNamesInput
+        .match(/(?:[^\s"]+|"[^"]*")+/g)
+        .map(word => (word.startsWith('"') && word.endsWith('"') ? word.slice(1, -1) : word))
+        .map(word => word.replace(/[^a-zA-Z0-9\s]/g, ''));
 
     resultContainer.innerHTML = '<h2>Output</h2>';
 
